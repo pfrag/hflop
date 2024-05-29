@@ -20,13 +20,17 @@ virtualenv -p python3 venv
 Run this command inside the above virtual environment.
 
 ## Running
-First generate a configuration. Example: `python generate.py -e 2 -d 10 -p 1 -l 4 -o cfg.json`
+First generate a configuration. Example: `python generate.py -e 2 -d 10 -p 1 -l 4 -D 10 -C 100 -o cfg.json`
 where:
+```
 -e: Number of edge nodes
 -d: Number of FL clients (devices)
 -p: Device participation ratio
 -l: Number of local aggregation rouds per global aggregator round
 -o: output file
+-C: maximum edge host processing capacity (requests/s)
+-D: maximum device workload (requests/s)
+```
 
 Then, execute like this: `python hflop.py -c cfg.json`. The output looks like this:
 ```
