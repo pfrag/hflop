@@ -10,7 +10,7 @@ import random
 MAXCAP = 100 # max edge node capacity (rps)
 MAXDEMAND = 10 # per client inference workload (rps)
 
-def generate(N, M, seed = None, participation_rate = 1.0, local_to_global_ratio = 4):
+def generate(N, M, seed = None, participation_ratio = 1.0, local_to_global_ratio = 4):
   """ Generate a topology with N clients & M edge nodes."""
   # seed PRNG
   if not seed:
