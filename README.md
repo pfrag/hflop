@@ -67,3 +67,8 @@ Then, execute like this: `python hflop.py -c cfg.json`. The output looks like th
 ```
 The field `objective` represents the value of the objective function corresponding to the calculated optimal solution.
 
+The other algorithms can be executed in a similar fashion. See also `example.py` on how to generate a problem instance
+and invoke the exact algorithm as well as two heuristic ones (greedy and local search-based). To experiment with a
+genetic algorithm (see `ga.py`), you need to `pip install pymoo` (https://www.pymoo.org/).
+
+

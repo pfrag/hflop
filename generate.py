@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 from random import *
 import time 
 import json 
@@ -9,8 +7,11 @@ import random
 
 MAXCAP = 100 # max edge node capacity (rps)
 MAXDEMAND = 10 # per client inference workload (rps)
+ZERO_COST_LAN = False
+MAX_CONN_COST = 10 # max connectivity cost
+MIN_CONN_COST = 0 # min connectivity cost
 
-def generate(N, M, seed = None, participation_ratio = 1.0, local_to_global_ratio = 4, max_edge_node_capacity = MAXCAP, max_device_demand = MAXDEMAND):
+def generate(N, M, seed = None, participation_ratio = 1.0, local_to_global_ratio = 4, max_edge_node_capacity = MAXCAP, max_device_demand = MAXDEMAND, zero_cost_lan = ZERO_COST_LAN, min_conn_cost = MIN_CONN_COST, max_conn_cost = MAX_CONN_COST):
   """ Generate a topology with N clients & M edge nodes."""
   # seed PRNG
   if not seed:
@@ -27,15 +28,18 @@ def generate(N, M, seed = None, participation_ratio = 1.0, local_to_global_ratio
   
   for j in range(0, M):
     R[j] = randint(0, max_edge_node_capacity) # random capacity
-    C_e[j] = 1 # for now, all transmissions between edge-cloud cost a unit
+    #C_e[j] = 1 # for now, all transmissions between edge-cloud cost a unit
+    C_e[j] = randint(0, max_conn_cost) # random costs
     
   for i in range(0, N):
-    # Each device is associated with a single edge node (0 communication cost).
-    # Unit costs to all other edge nodes
-    device_costs = [1]*M
-    device_costs[randint(0,M-1)] = 0
-    C_d[i] = device_costs
-    
+    if zero_cost_lan: 
+      # Each device is associated with a single edge node (0 communication cost).
+      # Unit costs to all other edge nodes
+      device_costs = [1]*M
+      device_costs[randint(0,M-1)] = 0
+      C_d[i] = device_costs
+    else:
+      C_d[i] = [randint(0, max_conn_cost) for m in range(0,M)]    
     # each client has a random inference workload
     D[i] = randint(0, max_device_demand)
     
