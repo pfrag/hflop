@@ -20,12 +20,14 @@ parser.add_argument("--id", type=str, default=0)
 parser.add_argument("--server_address", type=str, default=8080)
 parser.add_argument("--failure", type=int, default=0, required=False)
 parser.add_argument("--inference_request_rate", type=int, default=0, required=False)
+parser.add_argument("--inference_processing_capacity", type=int, default=0, required=False)
 args = parser.parse_args()
 
 
 class CifarClient(fl.client.NumPyClient):
 
-    def __init__(self, epochs, monitor, failure, inference_request_rate, id, server_address):
+    def __init__(self, epochs, monitor, failure, inference_request_rate, inference_processing_capacity, id,
+                 server_address):
         self.device = torch.device("cuda:0")
         self.model = Net(num_sensors=1, num_hidden_units=128, num_layers=2, t=12, dropout=0).to(self.device)
         self.epochs = epochs
@@ -36,6 +38,7 @@ class CifarClient(fl.client.NumPyClient):
         self.inference_request_rate = inference_request_rate
         self.id = id
         self.server_address = str(1) + str(server_address)[1:]
+        self.inference_processing_capacity = inference_processing_capacity
 
     def get_parameters(self, config):
         return [val.cpu().numpy() for _, val in self.model.state_dict().items()]
@@ -54,8 +57,8 @@ class CifarClient(fl.client.NumPyClient):
         train(self.model, train_loader, self.epochs, self.device)
         loss = test(self.model, test_loader, self.device)
         wandb.log({"local loss": loss, "epoch": logging_value})
-        (X, y) = list(test_loader)[-1] #only use last batch for inference
-        if (self.id == 1):  # TODO DEFINE STRATEGY HERE
+        (X, y) = list(test_loader)[-1]  # only use last batch for inference
+        if (self.inference_request_rate > self.inference_processing_capacity):
             send_inference_requests_to_server(X, y, self.inference_request_rate, self.server_address)
         else:
             inference(X, y, self.model, self.device, self.inference_request_rate)
@@ -80,4 +83,5 @@ if __name__ == "__main__":
     )
     fl.client.start_numpy_client(server_address=f"127.0.0.1:{args.server_address}",
                                  client=CifarClient(args.epochs, args.monitor, args.failure,
-                                                    args.inference_request_rate, args.id, args.server_address))
+                                                    args.inference_request_rate, args.inference_processing_capacity,
+                                                    args.id, args.server_address))
