@@ -6,6 +6,7 @@ import torch.nn as nn
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import Dataset, DataLoader, Subset
+import aiohttp
 
 
 class Net(nn.Module):
@@ -64,7 +65,6 @@ def mse(prediction, real_value):
 
 def test(model, test_loader, device):
     model.to(device)
-    print("TESTING")
     """Validate the network on the entire test set."""
     loss = 0
     model.eval()
@@ -74,8 +74,6 @@ def test(model, test_loader, device):
             result = model(X)
             loss += mse(result, y)
     loss = (loss / len(test_loader)).item()
-    print(loss)
-    print("LOSS")
     return loss
 
 
@@ -128,9 +126,7 @@ def load_data(id, batch_size, sequence_length, state):
     return train_dataloader, val_dataloader
 
 
-# list(val_dataloader)[-1]
 def inference(X, y, model, DEVICE, number_of_requests):
-    print("INFERENCE")
     model.to(DEVICE)
     start = time.time()
     for epoch in range(number_of_requests):
@@ -140,12 +136,25 @@ def inference(X, y, model, DEVICE, number_of_requests):
             prediction_result = model(X)
     end = time.time()
     total_time = end - start
-    print(total_time)
     return total_time
 
 
-def send_inference_requests_to_server(X, y, number_of_requests, port):
-    print("SEND INFERENCE TO SERVER")
+def write_inference_results(id, total_time):
+    f = open(f"results/{id}.txt", "a+")
+    f.write(f"{total_time}\n")
+    f.close()
+
+
+async def post_inference_data(data, port):
+    async with aiohttp.ClientSession() as session:
+        url = f'http://localhost:{port}/inference'
+        async with session.post(url, json=data) as response:
+            return await response.text()
+
+
+# Call server async. wait until it can write the request in a queue
+async def send_inference_requests_to_server(X, y, number_of_requests, port):
     data = {"X": X.tolist(), "y": y.tolist(), "number_of_requests": number_of_requests}
-    response = requests.post(f'http://localhost:{port}/inference', json=data)
+    response = await post_inference_data(data, port)
+    # print(response)
     return response

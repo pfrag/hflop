@@ -1,13 +1,11 @@
 import argparse
 from collections import OrderedDict
-from time import sleep
-
 import flwr as fl
 import torch
 
 import wandb
-from utils2 import train, test, load_data, Net, inference, send_inference_requests_to_server
-
+from utils2 import train, test, load_data, Net, inference, send_inference_requests_to_server, write_inference_results
+import asyncio
 # https://github.com/adap/flower/blob/main/examples/simulation_pytorch/main.py
 parser = argparse.ArgumentParser(description="Flower Simulation with PyTorch")
 # For wandb
@@ -53,15 +51,16 @@ class CifarClient(fl.client.NumPyClient):
         self.set_parameters(parameters, self.model)
         train_loader, test_loader = load_data(self.id, 16, 12, logging_value)
         loss = test(self.model, test_loader, self.device)
+        (X, y) = list(test_loader)[-1]  # only use last batch for inference
+        if (self.inference_request_rate >= self.inference_processing_capacity):
+            asyncio.run(send_inference_requests_to_server(X, y, self.inference_request_rate, self.server_address))
+        else:
+            total_time =inference(X, y, self.model, self.device, self.inference_request_rate)
+            write_inference_results(self.id, total_time)
         wandb.log({"global loss": loss, "epochs": logging_value})
         train(self.model, train_loader, self.epochs, self.device)
         loss = test(self.model, test_loader, self.device)
         wandb.log({"local loss": loss, "epoch": logging_value})
-        (X, y) = list(test_loader)[-1]  # only use last batch for inference
-        if (self.inference_request_rate > self.inference_processing_capacity):
-            send_inference_requests_to_server(X, y, self.inference_request_rate, self.server_address)
-        else:
-            inference(X, y, self.model, self.device, self.inference_request_rate)
         self.total_epochs = self.total_epochs + 1
         return self.get_parameters(config={}), len(train_loader.dataset), {}
 
@@ -69,7 +68,6 @@ class CifarClient(fl.client.NumPyClient):
         self.set_parameters(parameters, self.model)
         logging_value = self.total_epochs  # con issue
         train_loader, test_loader = load_data(self.id, 16, 12, logging_value)
-        print("evaluate")
         loss = test(self.model, test_loader, self.device)
         return float(loss), len(test_loader.dataset), {"loss": float(loss)}
 

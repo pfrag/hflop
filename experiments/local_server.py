@@ -9,10 +9,10 @@ import torch
 from flwr.server.client_proxy import ClientProxy
 from bottle import Bottle, request, response
 from flwr.server.strategy.aggregate import aggregate, weighted_loss_avg
-from typing import Callable, Dict, List, Optional, Tuple, Union
-
+from typing import Dict, List, Optional, Tuple, Union
+import queue
 import wandb
-from utils2 import Net, test, load_data, inference
+from utils2 import Net, test, load_data, inference, write_inference_results
 import logging
 from flwr.common.logger import log
 from flwr.common import (
@@ -27,6 +27,8 @@ from flwr.common import (
     ndarrays_to_parameters,
     parameters_to_ndarrays,
 )
+import functools
+import time
 
 cloud_aggregation_lock = threading.Lock()
 cloud_aggregation_lock.acquire()
@@ -49,6 +51,32 @@ args = parser.parse_args()
 current_edge_round = 0
 next_cloud_round = args.local_rounds
 model = Net(num_sensors=1, num_hidden_units=128, num_layers=2, t=12, dropout=0)
+app = Bottle()
+result_queue = queue.Queue()
+
+lock = threading.Lock()
+
+
+class CustomFedAvgGlobalServer(fl.server.strategy.FedAvg):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def aggregate_fit(
+            self,
+            server_round: int,
+            results: List[Tuple[ClientProxy, FitRes]],
+            failures: List[Union[Tuple[ClientProxy, FitRes], BaseException]],
+    ) -> Tuple[Optional[Parameters], Dict[str, Scalar]]:
+        """Aggregate fit results using weighted average."""
+        while result_queue.qsize() != 0:
+            time.sleep(2)  # Wait for 2 seconds before checking the queue again
+        weights_results = [
+            (parameters_to_ndarrays(fit_res.parameters), fit_res.num_examples)
+            for _, fit_res in results
+        ]
+        parameters_aggregated = ndarrays_to_parameters(aggregate(weights_results))
+        metrics_aggregated = {}
+        return parameters_aggregated, metrics_aggregated
 
 
 class CustomFedAvg(fl.server.strategy.FedAvg):
@@ -59,6 +87,9 @@ class CustomFedAvg(fl.server.strategy.FedAvg):
             failures: List[Union[Tuple[ClientProxy, FitRes], BaseException]],
     ) -> Tuple[Optional[Parameters], Dict[str, Scalar]]:
         """Aggregate fit results using weighted average."""
+        # Wait until the queue is empty
+        while result_queue.qsize() != 0:
+            time.sleep(2)  # Wait for 2 second before checking the queue again
         if not results:
             return None, {}
         # Do not aggregate if there are failures and failures are not accepted
@@ -178,23 +209,18 @@ class serverThread(threading.Thread):
 
         # Start Flower server
         fl.server.start_server(
-            server_address=f"127.0.0.1:{args.address}", #different port
+            server_address=f"127.0.0.1:{args.address}",  # different port
             config=fl.server.ServerConfig(num_rounds=args.rounds * args.local_rounds),
             strategy=customStrategy
         )
 
 
-app = Bottle()
-
 @app.post('/inference')
-def my_process():
+def inference_process(ID):
     "GET INFERENCE REQUEST"
     try:
-        req_obj = json.loads(request.body.read().decode('utf-8'))
-        X = req_obj["X"]
-        y = req_obj["y"]
-        number_of_requests = req_obj["number_of_requests"]
-        inference(X, y, model, "cpu", number_of_requests)
+        req_obj = request.body.read().decode('utf-8')
+        result_queue.put(req_obj)
         response.status = 200
         return 'All done'
     except json.JSONDecodeError:
@@ -202,7 +228,30 @@ def my_process():
         return 'Invalid JSON'
 
 
-def listen_to_route(port):
+# Function to consume results from the queue
+def consume_results(ID):
+    while True:
+        try:
+            req_data = result_queue.get()
+            req_obj = json.loads(req_data)
+            X_list = req_obj["X"]
+            X = torch.tensor(X_list)
+            y_list = req_obj["y"]
+            y = torch.tensor(y_list)
+            number_of_requests = req_obj["number_of_requests"]
+            total_time = inference(X, y, model, "cpu", number_of_requests)
+            # Write the result
+            write_inference_results(ID, total_time)
+            # Mark the task as done
+            result_queue.task_done()
+        except Exception as e:
+            print("Error consuming result:", e)
+
+
+def listen_to_route(port, ID):
+    print(port)
+    my_process_with_id = functools.partial(inference_process, ID)
+    app.route('/inference', 'POST', my_process_with_id)
     app.run(host='127.0.0.1', port=port)
 
 
@@ -222,25 +271,38 @@ if __name__ == "__main__":
     if not is_global_server:
         thread1 = clientThread(1, "Client-Thread", 1)
         thread2 = serverThread(2, "Server-Thread", 2)
-        route_thread = threading.Thread(target=listen_to_route, args=(str(1)+str(args.address)[1:],))
+        route_thread = threading.Thread(target=listen_to_route, args=(str(1) + str(args.address)[1:], id,))
         route_thread.start()
+        result_consumer_thread = threading.Thread(target=consume_results, args=(id,))
+        result_consumer_thread.daemon = True
+        result_consumer_thread.start()
+
         thread1.start()
         thread2.start()
         thread1.join()
         thread2.join()
+        result_consumer_thread.join()
         route_thread.join()
     else:
+        route_thread = threading.Thread(target=listen_to_route, args=(str(1) + str(args.address)[1:], id,))
+        route_thread.start()
+        result_consumer_thread = threading.Thread(target=consume_results, args=(id,))
+        result_consumer_thread.daemon = True
+        result_consumer_thread.start()
+        global_strategy = CustomFedAvgGlobalServer(
+            fraction_fit=1,
+            fraction_evaluate=1,
+            min_available_clients=number_clients,
+            min_fit_clients=number_clients,
+            min_evaluate_clients=number_clients,
+            accept_failures=True
+        )
         fl.server.start_server(
             server_address=f"127.0.0.1:{args.address}",
             config=fl.server.ServerConfig(num_rounds=args.rounds),
-            strategy=fl.server.strategy.FedAvg(
-                fraction_fit=1,
-                fraction_evaluate=1,
-                min_available_clients=number_clients,  # Never sample less than all clients for training
-                min_fit_clients=number_clients,  # Never sample less than all clients for evaluation
-                min_evaluate_clients=number_clients,  # wait until all clients are available
-                accept_failures=True
-            )
+            strategy=global_strategy
 
         )
+        result_consumer_thread.join()
+        route_thread.join()
     print("connect")
