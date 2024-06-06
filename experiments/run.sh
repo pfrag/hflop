@@ -19,7 +19,7 @@ clients_in_cluster_B=10
 #inference requests for each client
 inference_request_rate=(100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100)
 #inference request capacity for each client
-inference_processing_capacity=(100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100)
+inference_processing_capacity=(60 100 100 90 100 100 20 100 100 90 100 100 100 90 100 100 100 100 100 100)
 
 # Start global server first
 python3  local_server.py --number_clients "0" --project "$project_name" --id "g0" --rounds "$server_rounds" --address "8080" --local_rounds "$local_rounds"&

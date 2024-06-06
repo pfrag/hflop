@@ -126,9 +126,8 @@ def load_data(id, batch_size, sequence_length, state):
     return train_dataloader, val_dataloader
 
 
-def inference(X, y, model, DEVICE, number_of_requests):
+def inference(X, y, model, DEVICE, number_of_requests, start):
     model.to(DEVICE)
-    start = time.time()
     for epoch in range(number_of_requests):
         model.eval()
         with torch.no_grad():  # do not calculate the gradient
@@ -153,8 +152,8 @@ async def post_inference_data(data, port):
 
 
 # Call server async. wait until it can write the request in a queue
-async def send_inference_requests_to_server(X, y, number_of_requests, port):
-    data = {"X": X.tolist(), "y": y.tolist(), "number_of_requests": number_of_requests}
+async def send_inference_requests_to_server(X, y, number_of_requests, port, start):
+    data = {"X": X.tolist(), "y": y.tolist(), "number_of_requests": number_of_requests, "start_time": start}
     response = await post_inference_data(data, port)
     # print(response)
     return response

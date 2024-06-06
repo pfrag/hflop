@@ -239,7 +239,8 @@ def consume_results(ID):
             y_list = req_obj["y"]
             y = torch.tensor(y_list)
             number_of_requests = req_obj["number_of_requests"]
-            total_time = inference(X, y, model, "cpu", number_of_requests)
+            start_time=req_obj["start_time"]
+            total_time = inference(X, y, model, "cpu", number_of_requests, start_time)
             # Write the result
             write_inference_results(ID, total_time)
             # Mark the task as done

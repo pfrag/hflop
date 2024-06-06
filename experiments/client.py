@@ -1,4 +1,5 @@
 import argparse
+import time
 from collections import OrderedDict
 import flwr as fl
 import torch
@@ -26,7 +27,8 @@ class CifarClient(fl.client.NumPyClient):
 
     def __init__(self, epochs, monitor, failure, inference_request_rate, inference_processing_capacity, id,
                  server_address):
-        self.device = torch.device("cuda:0")
+        device_nr=int(id[1:])%2
+        self.device = torch.device(f"cuda:{device_nr}")
         self.model = Net(num_sensors=1, num_hidden_units=128, num_layers=2, t=12, dropout=0).to(self.device)
         self.epochs = epochs
         self.monitor = monitor
@@ -52,10 +54,11 @@ class CifarClient(fl.client.NumPyClient):
         train_loader, test_loader = load_data(self.id, 16, 12, logging_value)
         loss = test(self.model, test_loader, self.device)
         (X, y) = list(test_loader)[-1]  # only use last batch for inference
-        if (self.inference_request_rate >= self.inference_processing_capacity):
-            asyncio.run(send_inference_requests_to_server(X, y, self.inference_request_rate, self.server_address))
+        start = time.time()
+        if (self.inference_request_rate > self.inference_processing_capacity):
+            asyncio.run(send_inference_requests_to_server(X, y, self.inference_request_rate, self.server_address, start))
         else:
-            total_time =inference(X, y, self.model, self.device, self.inference_request_rate)
+            total_time =inference(X, y, self.model, self.device, self.inference_request_rate, start)
             write_inference_results(self.id, total_time)
         wandb.log({"global loss": loss, "epochs": logging_value})
         train(self.model, train_loader, self.epochs, self.device)
