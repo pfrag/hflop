@@ -265,7 +265,7 @@ def export_solution(configuration, solution, solution_time=None):
     for k in range(len(values)):
       if int(values[k]) == 1:
         associated_devices.append(k)
-        used_capacity += D[k-1]
+        used_capacity += D[k]
     host["associated_devices"] = associated_devices
     host["available_capacity"] = available_capacity
     host["used_capacity"] = used_capacity
