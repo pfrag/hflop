@@ -39,17 +39,18 @@ continue_edge_round_lock.acquire()
 # https://github.com/adap/flower/blob/main/examples/simulation_pytorch/main.py
 parser = argparse.ArgumentParser(description="Flower Simulation with PyTorch")
 # For wandb
-parser.add_argument("--number_clients", type=int, default=64)  # clients in the training
-parser.add_argument("--project", type=str, default="")
+parser.add_argument("--n_c", type=int, default=64)  # clients in the training
+parser.add_argument("--pr", type=str, default="")
 # For the flower client
 parser.add_argument("--id", type=str, default=0)
 parser.add_argument("--rounds", type=int, default=0)
 parser.add_argument("--address", type=int, default=0)
-parser.add_argument("--local_rounds", type=int, default=0)
+parser.add_argument("--l_r", type=int, default=0)
+parser.add_argument("--server_capacity", type=int, default=0)
 args = parser.parse_args()
 
 current_edge_round = 0
-next_cloud_round = args.local_rounds
+next_cloud_round = args.l_r
 model = Net(num_sensors=1, num_hidden_units=128, num_layers=2, t=12, dropout=0)
 app = Bottle()
 result_queue = queue.Queue()
@@ -128,7 +129,7 @@ class CustomFedAvg(fl.server.strategy.FedAvg):
         print("ServerThread - Finished edge aggregation: " + str(current_edge_round))
 
         if current_edge_round == next_cloud_round:
-            next_cloud_round += args.local_rounds
+            next_cloud_round += args.l_r
 
             print("ServerThread - Releasing cloud aggregation lock...")
             cloud_aggregation_lock.release()
@@ -210,7 +211,7 @@ class serverThread(threading.Thread):
         # Start Flower server
         fl.server.start_server(
             server_address=f"127.0.0.1:{args.address}",  # different port
-            config=fl.server.ServerConfig(num_rounds=args.rounds * args.local_rounds),
+            config=fl.server.ServerConfig(num_rounds=args.rounds),
             strategy=customStrategy
         )
 
@@ -229,7 +230,7 @@ def inference_process(ID):
 
 
 # Function to consume results from the queue
-def consume_results(ID):
+def consume_results(ID,server_capacity):
     while True:
         try:
             req_data = result_queue.get()
@@ -239,10 +240,10 @@ def consume_results(ID):
             y_list = req_obj["y"]
             y = torch.tensor(y_list)
             number_of_requests = req_obj["number_of_requests"]
-            start_time=req_obj["start_time"]
-            total_time = inference(X, y, model, "cpu", number_of_requests, start_time)
+            latency=req_obj["latency"]
+            latency, calc_time = inference(X, y, model, "cuda:0", number_of_requests, latency, server_capacity)
             # Write the result
-            write_inference_results(ID, total_time)
+            write_inference_results(latency, calc_time)
             # Mark the task as done
             result_queue.task_done()
         except Exception as e:
@@ -257,7 +258,7 @@ def listen_to_route(port, ID):
 
 
 if __name__ == "__main__":
-    number_clients = args.number_clients
+    number_clients = args.n_c
     id = args.id
     is_global_server = id.startswith("g")
     server_position = 'local'
@@ -265,16 +266,17 @@ if __name__ == "__main__":
         server_position = 'global'
     print(f"started {server_position} server-{id}")
     wandb.init(
-        project=args.project,
+        project=args.pr,
         name=f"{server_position} server-{id}",
         mode="online",
     )
+    server_capacity=args.server_capacity
     if not is_global_server:
         thread1 = clientThread(1, "Client-Thread", 1)
         thread2 = serverThread(2, "Server-Thread", 2)
         route_thread = threading.Thread(target=listen_to_route, args=(str(1) + str(args.address)[1:], id,))
         route_thread.start()
-        result_consumer_thread = threading.Thread(target=consume_results, args=(id,))
+        result_consumer_thread = threading.Thread(target=consume_results, args=(id,server_capacity,))
         result_consumer_thread.daemon = True
         result_consumer_thread.start()
 
@@ -287,7 +289,7 @@ if __name__ == "__main__":
     else:
         route_thread = threading.Thread(target=listen_to_route, args=(str(1) + str(args.address)[1:], id,))
         route_thread.start()
-        result_consumer_thread = threading.Thread(target=consume_results, args=(id,))
+        result_consumer_thread = threading.Thread(target=consume_results, args=(id,server_capacity,))
         result_consumer_thread.daemon = True
         result_consumer_thread.start()
         global_strategy = CustomFedAvgGlobalServer(

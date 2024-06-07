@@ -1,10 +1,10 @@
 #!/bin/bash
 #run with bash run.sh
 
-#change the latency in the client.py + name of dir+only for hier benchmark in client
+#change the latency in the client.py + name of dir
 
 #name for wandb
-proj="NON-Hier l0.0008 l0.01 speed1"
+proj="HFLOP l0.0008 l0.01 speed1"
 #global server
 s_r=100
 #local aggregations
@@ -16,10 +16,10 @@ number_failing_clients=0
 failure_rounds=0
 
 # Clients in each cluster
-clients_in_cluster_A=5
-clients_in_cluster_B=5
-clients_in_cluster_C=5
-clients_in_cluster_D=5
+clients_in_cluster_A=4
+clients_in_cluster_B=6
+clients_in_cluster_C=4
+clients_in_cluster_D=6
 
 #inference requests for each client
 ids=(771667 767495 767523 718064 767621 717571 760987 717492 769359 717491 769443 765099 717508 767350 772596 716968 717481 717461 716337 761604)

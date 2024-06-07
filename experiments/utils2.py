@@ -118,7 +118,11 @@ def load_data(id, batch_size, sequence_length, state):
     data = data.rename(columns={'Unnamed: 0': 'timestamp'})
     data['timestamp'] = pd.to_datetime(data['timestamp'])
     data = data.set_index('timestamp')
-    column = data.columns[id]
+    if not str(id) in data.columns:
+        column = data.columns[id]
+    # column = data.columns[id]
+    else:
+        column=str(id)
     scaler = MinMaxScaler()
     data[[column]] = scaler.fit_transform(data[[column]])
     train_dataloader, val_dataloader = create_dataloaders(data, column, batch_size=batch_size,
@@ -126,21 +130,29 @@ def load_data(id, batch_size, sequence_length, state):
     return train_dataloader, val_dataloader
 
 
-def inference(X, y, model, DEVICE, number_of_requests, start):
+def inference(X, y, model, DEVICE, number_of_requests, latency, speed):
     model.to(DEVICE)
-    for epoch in range(number_of_requests):
+    requests=int(number_of_requests/speed)
+    start_time = time.time()
+    for epoch in range(requests):
         model.eval()
         with torch.no_grad():  # do not calculate the gradient
             X, y = X.to(DEVICE), y.to(DEVICE)
             prediction_result = model(X)
     end = time.time()
-    total_time = end - start
-    return total_time
+    return latency, (end - start_time)
 
 
-def write_inference_results(id, total_time):
-    f = open(f"results/{id}.txt", "a+")
-    f.write(f"{total_time}\n")
+def write_latency_results(id, latency):
+    f = open(f"results/non_hier/latency.txt", "a+")
+    f.write(f"{id}: {latency}\n")
+    f.close()
+
+def write_inference_results(latency, calc_time):
+    f = open(f"results/non_hier/latencies.txt", "a+")
+    f.write(f"{latency}\n")
+    f = open(f"results/non_hier/calculations.txt", "a+")
+    f.write(f"{calc_time}\n")
     f.close()
 
 
@@ -152,8 +164,8 @@ async def post_inference_data(data, port):
 
 
 # Call server async. wait until it can write the request in a queue
-async def send_inference_requests_to_server(X, y, number_of_requests, port, start):
-    data = {"X": X.tolist(), "y": y.tolist(), "number_of_requests": number_of_requests, "start_time": start}
+async def send_inference_requests_to_server(X, y, number_of_requests, port, latency):
+    data = {"X": X.tolist(), "y": y.tolist(), "number_of_requests": number_of_requests, "latency": latency}
     response = await post_inference_data(data, port)
     # print(response)
     return response
