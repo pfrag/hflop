@@ -29,7 +29,7 @@ def generate(N, M, seed = None, participation_ratio = 1.0, local_to_global_ratio
   for j in range(0, M):
     R[j] = randint(0, max_edge_node_capacity) # random capacity
     #C_e[j] = 1 # for now, all transmissions between edge-cloud cost a unit
-    C_e[j] = randint(0, max_conn_cost) # random costs
+    C_e[j] = randint(min_conn_cost, max_conn_cost) # random costs
     
   for i in range(0, N):
     if zero_cost_lan: 

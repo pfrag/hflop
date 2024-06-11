@@ -63,7 +63,10 @@ def generate(device_indexes, hosts, pairs, seed = None, participation_ratio = 1.
   N = len(device_indexes)
   M = len(hosts)
   
+  # will lead to less excess capacity
   max_device_demand = int(1.7*sum(edge_node_capacities)/N)
+  # will lead to more excess capacity
+  #max_device_demand = int(sum(edge_node_capacities)/N)
   
   # Capacity vector R: includes the network capacity for each pair of hosts. This is not assumed symmetric.
   # Cost matrix C_d: c_ij encodes the cost/bit to tx/rx between device i and edge node j
@@ -92,30 +95,31 @@ def generate(device_indexes, hosts, pairs, seed = None, participation_ratio = 1.
   scenario = {"seed": seed, "capacities": R, "workload": D, "device_costs": C_d, "edge_costs": C_e, "participation_ratio": participation_ratio, "local_to_global_ratio": local_to_global_ratio}
   return scenario
 
-# parse cluster information
-device_indexes, hosts, pairs = get_dev_edge_pairs(INFILE)
+if __name__ == '__main__':
+  # parse cluster information
+  device_indexes, hosts, pairs = get_dev_edge_pairs(INFILE)
 
-# generate a configuration appropriate for solving
-configuration = generate(device_indexes, hosts, pairs, int(time.time()), 1.0, 4, capacities, True, 1, 1)
+  # generate a configuration appropriate for solving
+  configuration = generate(device_indexes, hosts, pairs, int(time.time()), 1.0, 4, capacities, True, 1, 1)
 
-# solve and generate an assignment
-assignment = hflop(configuration, model_version = 2)
+  # solve and generate an assignment
+  assignment = hflop(configuration, model_version = 2)
 
-if assignment is None:
-  print("No feasible solution found.")
-else:
-  # format the solution so that it includes the original device IDs as well as workloads
-  translated = translate_assignment(configuration, assignment, device_indexes)
+  if assignment is None:
+    print("No feasible solution found.")
+  else:
+    # format the solution so that it includes the original device IDs as well as workloads
+    translated = translate_assignment(configuration, assignment, device_indexes)
 
-# write output to file
-fp = open(OUTFILE, "w+")
-json.dump(translated, fp, indent=2)
-fp.close()
+  # write output to file
+  fp = open(OUTFILE, "w+")
+  json.dump(translated, fp, indent=2)
+  fp.close()
 
-# write configuration to file
-fp = open(CONFIGURATION, "w+")
-json.dump(configuration, fp, indent=2)
-fp.close()
+  # write configuration to file
+  fp = open(CONFIGURATION, "w+")
+  json.dump(configuration, fp, indent=2)
+  fp.close()
 
-print(json.dumps(translated, indent=2))
+  print(json.dumps(translated, indent=2))
 
