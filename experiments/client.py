@@ -37,9 +37,9 @@ class CifarClient(fl.client.NumPyClient):
         self.monitor = monitor
         self.failure = failure
         self.id = id
-        self.latency = random.uniform(0.0008, 0.01)  # latency
-        # if str(id) is "767621" or str(id) is "772596": #only for hier benchmark
-        #     self.latency = self.latency + random.uniform(0.05, 0.1)  # latency
+        self.latency = random.uniform(0.0008, 0.01)#0.05, 0.1)#0.0008, 0.01)  # latency
+        if str(id[1:]) == "767621" or str(id[1:]) == "772596": #only for hier benchmark
+            self.latency = self.latency + random.uniform(0.05, 0.1)  # latency
         write_latency_results(self.id, self.latency)
         print(self.latency)
         self.count = 0
