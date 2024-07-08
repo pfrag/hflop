@@ -1,3 +1,5 @@
+import math
+
 import numpy
 import seaborn as sns
 import pandas as pd
@@ -16,6 +18,15 @@ def calculate_average(values):
     return sum(values) / len(values)
 
 
+def calculate_standard_deviation(values):
+    if not values:
+        return 0
+
+    mean = sum(values) / len(values)
+    variance = sum((x - mean) ** 2 for x in values) / len(values)
+    standard_deviation = math.sqrt(variance)
+
+    return standard_deviation
 
 directories = ['./non_hier', './hier',  './hflop']
 dirs = ['Non-Hierarchical Benchmark', 'Hierarchical Benchmark', 'HFLOP']
@@ -30,6 +41,9 @@ for i in range(len(directories)):
     # Sum the values pairwise
     total_sum = [x + y for x, y in zip(values1, values2)]
     aver=calculate_average(total_sum)
+    std=calculate_standard_deviation(total_sum)
+    print(dirs[i])
+    print(std)
     print(aver)
     # Append the total sum to the data list with the corresponding directory
     data.append({'directory': dirs[i], 'value': total_sum})

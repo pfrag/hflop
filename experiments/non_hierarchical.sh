@@ -4,7 +4,7 @@
 #change the latency in the client.py + name of dir
 
 #name for wandb
-proj="Non Hierarchical Benchmark l0.05 l0.1 speed1"
+proj="Non Hierarchical Benchmark l0.05 l0.1 speed 1 10"
 #global server
 s_r=100
 #local aggregations
@@ -24,9 +24,12 @@ clients_in_cluster_D=6
 #inference requests for each client
 ids=(771667 767495 767523 718064 767621 717571 760987 717492 769359 717491 769443 765099 717508 767350 772596 716968 717481 717461 716337 761604)
 
-i_req_r=(2 13 3 20 23 7 26 23 14 22 15 8 6 0 12 16 2 20 8 3)
+#i_req_r=(2 13 3 20 23 7 26 23 14 22 15 8 6 0 12 16 2 20 8 3)
+#i_req_r=(20 130 30 200 230 70 260 230 140 220 150 80 60 0 120 160 20 200 80 30)
+i_req_r=(200 1300 300 2000 2300 700 2600 2300 1400 2200 1500 800 600 0 1200 1600 200 2000 800 300)
+
 #inference request capacity for each client
-i_p_c=(2 13 3 20 23 7 26 23 14 22 15 8 6 0 12 16 2 20 8 3)
+i_p_c=(200 1300 300 2000 2300 700 2600 2300 1400 2200 1500 800 600 0 1200 1600 200 2000 800 300)
 
 #Start global server first
 python3  local_server.py --n_c "20" --pr "$proj" --id "g0" --rounds "$s_r" --address "8080" --l_r "$l_r" --server_capacity "1"&
