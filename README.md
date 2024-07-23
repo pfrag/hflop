@@ -9,9 +9,7 @@ allowing simultaneous (H)FL training and inference serving, and tools to
 evaluate this approach on a traffic flow prediction use case.
 
 More details can be found in the following article:
-```
-A. Lackinger, P. A. Frangoudis, I. Čilić, A. Furutanpey, I. Murturi, I. Podnar Zarko, and S. Dustdar, "Inference Load-Aware Orchestration for Hierarchical Federated Learning," in Proc. 49th IEEE Conference on Local Computer Networks (LCN), 2024.
-```
+>A. Lackinger, P. A. Frangoudis, I. Čilić, A. Furutanpey, I. Murturi, I. Podnar Zarko, and S. Dustdar, "Inference Load-Aware Orchestration for Hierarchical Federated Learning," in Proc. 49th IEEE Conference on Local Computer Networks (LCN), 2024.
 
 ## Structure
 - `data`: Tools for dataset processing.
