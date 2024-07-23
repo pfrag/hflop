@@ -1,7 +1,7 @@
 import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
-
+import numpy as np
 import contextily as ctx
 from sklearn.cluster import KMeans
 
@@ -43,8 +43,6 @@ from sklearn.cluster import KMeans
 
 # -----------------------------------------CLUSTERING-----------------------------------------------------------
 
-
-# Read the CSV file
 df = pd.read_csv('./graph_sensor_locations.csv')
 df = df.set_index('sensor_id')
 
@@ -52,27 +50,24 @@ gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.longitude, df.latitude
 gdf = gdf.to_crs(epsg=3857)
 
 # Perform K-means clustering
-kmeans = KMeans(n_clusters=4, random_state=0)
+kmeans = KMeans(n_clusters=4, random_state=23)
 gdf['cluster'] = kmeans.fit_predict(gdf[['geometry']].apply(lambda geom: geom.x))
 
-fig, ax = plt.subplots(figsize=(16, 12))  # Adjust the figure size as needed
-
-# Print indices for each cluster
-for cluster_num, indices in gdf.groupby('cluster').groups.items():
-    # Plot 5 values for the current cluster
-    gdf_sample = gdf.loc[indices[:5]]  # Select the first 5 indices for the cluster
-    gdf_sample.plot(ax=ax, color='red', markersize=100, label=f'Cluster {cluster_num} Sample Points', alpha=0.5)
-
-    print(f"Cluster {cluster_num} Indices: {indices}")
-
-
+fig, ax = plt.subplots(figsize=(16, 12))
 # Plot the points with cluster coloring
 gdf.plot(ax=ax, column='cluster', cmap='viridis', markersize=50, legend=True)
 ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik)
 
+# Print indices for each cluster
+
+marker_styles = ['D', '^', 's', 'o']  # Circle, Triangle, Square, Diamond
+for cluster_num, indices in gdf.groupby('cluster').groups.items():
+    random_indices = np.random.RandomState(27).choice(indices, size=min(5, len(indices)), replace=False)
+
+    gdf_sample = gdf.loc[random_indices]  # Select the first 5 indices for the cluster
+    ax.scatter(gdf_sample.geometry.x, gdf_sample.geometry.y, color='red', s=100,
+               label=f'Cluster {cluster_num} Sample Points', alpha=0.5, marker=marker_styles[cluster_num])
+
 ax.set_title('Clustered Locations Map', size=20)
-# ax.set_xlabel('Longitude')
-# ax.set_ylabel('Latitude')
 plt.savefig("./clustered_street_map.png")
 plt.show()
-
